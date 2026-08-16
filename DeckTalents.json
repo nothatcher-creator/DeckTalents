@@ -1,0 +1,18 @@
+{
+    "id": "DeckTalents",
+    "name": "Deck Talents",
+    "display_name": "TALENTS",
+    "author": [
+        "Brad & OpenAI"
+    ],
+    "description": "Fullscreen mouse-driven talent webs with connector-sprite pathways, Ante-scaled scoring, per-talent enable/disable controls, mastery tracking, Live Power, Talent Shop, Talentless Deck, and persistent Talent Points.",
+    "prefix": "dkt",
+    "main_file": "main.lua",
+    "priority": 0,
+    "badge_colour": "6C5CE7",
+    "badge_text_colour": "FFFFFF",
+    "version": "1.6.3",
+    "dependencies": [
+        "Steamodded (>=1.0.0~BETA-1814a)"
+    ]
+}
