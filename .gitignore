@@ -1,0 +1,23 @@
+# OS / editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Local test output
+*.log
+crash_log.txt
+crash-log.txt
+/test-output/
+/tmp/
+
+# Local package/build folders
+/build/
+/dist/
+DeckTalents_*.zip
+
+# Local save/config copies
+*.bak
+*.backup
