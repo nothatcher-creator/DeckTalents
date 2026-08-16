@@ -5,7 +5,9 @@ Permanent progression, full-screen talent webs, and a Talent Point economy for B
 **Current version:** 1.6.3 — Full-Canvas Web  
 **Requires:** Balatro 1.0.1o, Lovely, and Steamodded `1.0.0~BETA-1814a` or newer
 
-Deck Talents adds a permanent progression system to every vanilla Balatro deck. Each deck has its own 15-talent tree, alongside 30 Global Talents, a shared Talent Point bank, a Talent Shop, a Talentless Deck, mastery tracking, Live Power readouts, and optional Ante-based scoring scaling.
+Deck Talents adds permanent progression to every vanilla Balatro deck. Each deck has its own 15-talent tree, alongside 30 Global Talents, a shared Talent Point bank, a Talent Shop, a Talentless Deck, mastery tracking, Live Power readouts, and optional Ante-based scoring scaling.
+
+> **Download note:** packaged, ready-to-install builds include a large custom art library. Use the packaged ZIP from the GitHub Releases page once published, or the Nexus Mods page: https://www.nexusmods.com/balatro/mods/896
 
 ## Highlights
 
@@ -40,7 +42,7 @@ Progress is stored through Steamodded and is designed to survive normal mod upda
 
 ## Adaptive Power
 
-Deck Talents can scale scoring bonuses with the current Ante. The previous fixed scoring values are treated as their approximate **Ante 8 reference strength**.
+Deck Talents can scale scoring bonuses with the current Ante. The old fixed scoring values are treated as their approximate **Ante 8 reference strength**.
 
 - Ante 1: roughly 12.5% of reference scoring power
 - Ante 4: roughly 50%
@@ -52,8 +54,6 @@ XMult scales only the bonus above X1, so early Antes do not turn positive XMult 
 Ante Scaling can be toggled from the mod configuration. Individual unlocked talents can also be enabled or disabled without losing ownership, prerequisites, or mastery progress.
 
 ## Talent Web Controls
-
-The current talent browser is a full-screen web.
 
 - **Mouse wheel:** zoom
 - **Left-click + drag:** pan
@@ -85,11 +85,13 @@ It still earns Talent Points from Boss Blinds and Blind skips, and the Talent Sh
 
 ## Installation
 
+For normal players, use the packaged ZIP rather than the repository's source view.
+
 1. Install Lovely.
 2. Install Steamodded `1.0.0~BETA-1814a` or newer.
-3. Download or clone this repository.
-4. Make sure the folder containing `DeckTalents.json` is named `DeckTalents`.
-5. Put that folder in your Balatro Mods directory.
+3. Download the latest Deck Talents ZIP.
+4. Extract the complete `DeckTalents` folder into your Balatro Mods folder.
+5. Confirm `DeckTalents.json` is directly inside `DeckTalents`.
 6. Launch Balatro and confirm **Deck Talents** appears in the Mods menu.
 
 Typical Windows path:
@@ -115,33 +117,46 @@ Balatro/
 
 ## Updating
 
-Replace the old Deck Talents files with the newer version while keeping the folder name `DeckTalents`. Existing Talent Points, purchased talents, mastery state, cosmetics, and activation settings are migrated by the mod configuration system.
+Replace the old `DeckTalents` folder with the newer packaged version. Do not place the new folder inside the old one. Existing Talent Points, purchased talents, mastery state, cosmetics, and activation settings are migrated by the mod configuration system.
 
 ## Compatibility / Testing
 
-The mod targets:
+Primary target:
 
 - Balatro `1.0.1o-FULL`
 - Steamodded `1.0.0~BETA-1814a`
 - LÖVE `11.5.0`
 - Lovely `0.9.0`
 
-Deck Talents is under active development. Static and mocked runtime checks are used during development, but live-game UI behavior can still differ across resolutions, platforms, and mod combinations. Detailed bug reports with a crash log, resolution, window mode, and screenshots are especially useful.
+Deck Talents is under active development. Live-game UI behavior can differ across resolutions, platforms, and mod combinations. Bug reports are most useful when they include:
+
+- crash log, if there is one
+- Deck Talents version
+- Steamodded/Lovely version
+- resolution and fullscreen/windowed/borderless mode
+- installed mod list
+- screenshot when the issue is visual
+- exact talent/deck involved
+- steps that reproduce the problem
+
+## Feedback
+
+Balance feedback is especially useful now that Ante Scaling exists. When possible, include the deck, stake, Ante, active talents, and what felt too strong or too weak.
+
+Use GitHub Issues for reproducible bugs and structured balance feedback.
 
 ## Documentation
 
-- [`CHANGELOG.md`](CHANGELOG.md) — version history
 - [`TALENT_SHOP.md`](TALENT_SHOP.md) — Talent Shop catalog and rules
-- [`GLOBAL_TALENTS.md`](GLOBAL_TALENTS.md) — Global Talent notes
-- [`LEGENDARY_TALENTS.md`](LEGENDARY_TALENTS.md) — Legendary talent details
+- [`GLOBAL_TALENTS.md`](GLOBAL_TALENTS.md) — Global Talents
+- [`LEGENDARY_TALENTS.md`](LEGENDARY_TALENTS.md) — Legendary capstones
 - [`TALENTLESS_DECK.md`](TALENTLESS_DECK.md) — Talentless Deck behavior
-- [`SPRITES.md`](SPRITES.md) — sprite/atlas notes
-- [`TESTING_CHECKLIST.md`](TESTING_CHECKLIST.md) — QA checklist
+- [`SPRITES.md`](SPRITES.md) — sprite and atlas notes
 
 ## Credits
 
 **Deck Talents** by Brad & OpenAI.
 
-Special thanks to the testers and community members who have repeatedly put the mod through real runs and helped identify UI, balance, progression, and compatibility issues.
+Special thanks to Kaiser and the other testers/community members who have repeatedly put the mod through real runs and helped identify UI, balance, progression, and compatibility issues.
 
-Balatro is created by LocalThunk. Deck Talents is an unofficial fan-made mod and is not affiliated with LocalThunk, Playstack, or the Steamodded project.
+Balatro is created by LocalThunk. Deck Talents is an unofficial fan-made mod and is not affiliated with LocalThunk, Playstack, Nexus Mods, Lovely, or the Steamodded project.
