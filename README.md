@@ -155,7 +155,7 @@ Use GitHub Issues for reproducible bugs and structured balance feedback.
 
 ## Credits
 
-**Deck Talents** by Brad & OpenAI.
+**Deck Talents** by Nothatcher
 
 Special thanks to Kaiser and the other testers/community members who have repeatedly put the mod through real runs and helped identify UI, balance, progression, and compatibility issues.
 
