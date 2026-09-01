@@ -4,38 +4,38 @@
 
 **Goal:** Rebalance every non-Red Deck Talents tree to the approved strong-but-fair targets while preserving v1.7.14+ profile progression and adding deterministic runtime support for consumable-use and Erratic mechanics.
 
-**Architecture:** Restore the complete v1.7.15 package as the implementation baseline, keep talent IDs stable, and continue using the existing data-driven `talents.lua` + `deck_expansion.lua` model. Add one small pure helper module for conditions/caps/random-choice resolution so the new runtime rules can be unit-tested without booting Balatro; `main.lua` remains the Steamodded/LÖVE integration layer.
+**Architecture:** Restore the complete v1.7.15 package as the implementation baseline, keep talent IDs stable, and continue using the existing data-driven `talents.lua` + `deck_expansion.lua` model. Add one pure helper module for condition checks, capped factors, per-Blind consumable flags, and discrete random choices; `main.lua` remains the Steamodded/LÖVE integration layer.
 
-**Tech Stack:** Lua / LÖVE 11.5, Steamodded, Balatro 1.0.1o-FULL [M], `texluac -p`, Luacheck 1.2.0, JSON metadata, Git/GitHub.
+**Tech Stack:** Lua / LÖVE 11.5, Steamodded, Balatro 1.0.1o-FULL [M], `texluac -p`, Luacheck 1.2.0, Python source-contract tests, JSON metadata, Git/GitHub.
 
 **Spec:** `docs/superpowers/specs/2026-09-01-deck-talents-ui-balance-design.md`
 
 ## Global Constraints
 
-- Target baseline is Deck Talents v1.7.15 from `/mnt/data/DeckTalents_v1.7.15_red_tree_balance.zip`, SHA-256 `65b4c7b26607cb03996433f937b0ed273e585c2fc9b6a0c0c46fd1d9cdbaa4d8`.
+- Baseline artifact: `/mnt/data/DeckTalents_v1.7.15_red_tree_balance.zip`.
+- Baseline SHA-256: `65b4c7b26607cb03996433f937b0ed273e585c2fc9b6a0c0c46fd1d9cdbaa4d8`.
 - Red Deck balance remains unchanged unless a functional bug is found.
-- Existing talent IDs are retained so purchased talents survive the update.
-- Existing v1.7.14+ per-profile progression and reset behavior remain compatible.
-- New Magic/Ghost per-Blind flags are runtime-only and reset at Blind start.
-- No easy unconditional XMult stack may become the main identity of a remaining deck.
-- All caps in the approved spec are hard caps even when another mod adds hands, discards, Joker slots, Tags, or hand size.
+- Existing talent IDs and prerequisite IDs remain unchanged so purchased talents survive the update.
+- Existing v1.7.14+ per-profile progression/reset behavior remains compatible.
+- Magic/Ghost per-Blind flags are runtime-only and reset at Blind start.
+- Hard caps in the spec remain hard caps even when other mods add resources.
+- Talents not explicitly named in the exact-target sections keep their v1.7.15 behavior in this first pass.
 - Descriptions, gameplay behavior, live previews, and docs must agree.
-- No UI redesign is performed in this plan except live-value/model changes required by the balance rules; the separate UI plan owns visual work.
+- This plan does not redesign the constellation visuals; the separate UI plan owns that work.
 
 ---
 
 ### Task 1: Restore the complete v1.7.15 source baseline
 
 **Files:**
-- Restore/create from package: `main.lua`, `talents.lua`, `deck_expansion.lua`, `talent_map.lua`, `sprites.lua`, `global_talents.lua`, `talent_shop.lua`, `talentless_deck.lua`
-- Restore/update docs from package: `README.md`, `CHANGELOG.md`, `NEW_DECK_TALENTS.md`, `LEGENDARY_TALENTS.md`, `TESTING_CHECKLIST.md`, `DeckTalents.json`, `config.lua`
-- Keep all existing `assets/1x/*` and `assets/2x/*` byte-identical to the v1.7.15 package.
+- Restore/create: `main.lua`, `talents.lua`, `deck_expansion.lua`, `talent_map.lua`, `sprites.lua`, `global_talents.lua`, `talent_shop.lua`, `talentless_deck.lua`
+- Restore/update: `README.md`, `CHANGELOG.md`, `NEW_DECK_TALENTS.md`, `LEGENDARY_TALENTS.md`, `TESTING_CHECKLIST.md`, `DeckTalents.json`, `config.lua`, `assets/1x/*`, `assets/2x/*`
 
 **Interfaces:**
-- Consumes: the approved v1.7.15 ZIP named in Global Constraints.
-- Produces: a repository tree whose text source matches the v1.7.15 package before balance changes begin.
+- Consumes: v1.7.15 ZIP named above.
+- Produces: repository source matching the package before balance edits.
 
-- [ ] **Step 1: Verify the artifact before unpacking**
+- [ ] **Step 1: Verify the artifact**
 
 ```bash
 sha256sum /mnt/data/DeckTalents_v1.7.15_red_tree_balance.zip
@@ -43,21 +43,16 @@ sha256sum /mnt/data/DeckTalents_v1.7.15_red_tree_balance.zip
 
 Expected: `65b4c7b26607cb03996433f937b0ed273e585c2fc9b6a0c0c46fd1d9cdbaa4d8`.
 
-- [ ] **Step 2: Unpack into a clean staging directory**
+- [ ] **Step 2: Stage and sync the package while preserving planning docs**
 
 ```bash
 rm -rf /tmp/decktalents-v1715
 mkdir -p /tmp/decktalents-v1715
 unzip -q /mnt/data/DeckTalents_v1.7.15_red_tree_balance.zip -d /tmp/decktalents-v1715
-```
-
-- [ ] **Step 3: Copy the package contents into the feature worktree without deleting `docs/superpowers/`**
-
-```bash
 rsync -a --exclude 'docs/superpowers/' /tmp/decktalents-v1715/DeckTalents/ ./
 ```
 
-- [ ] **Step 4: Parse every restored Lua file**
+- [ ] **Step 3: Parse all baseline Lua**
 
 ```bash
 find . -maxdepth 1 -name '*.lua' -print0 | xargs -0 -n1 texluac -p
@@ -65,80 +60,81 @@ find . -maxdepth 1 -name '*.lua' -print0 | xargs -0 -n1 texluac -p
 
 Expected: exit code 0.
 
-- [ ] **Step 5: Commit the restored implementation baseline**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add main.lua talents.lua deck_expansion.lua talent_map.lua sprites.lua global_talents.lua talent_shop.lua talentless_deck.lua '*.md' DeckTalents.json config.lua assets
+git add main.lua talents.lua deck_expansion.lua talent_map.lua sprites.lua global_talents.lua talent_shop.lua talentless_deck.lua README.md CHANGELOG.md NEW_DECK_TALENTS.md LEGENDARY_TALENTS.md TESTING_CHECKLIST.md DeckTalents.json config.lua assets
 git commit -m "chore: restore complete v1.7.15 source baseline"
 ```
 
 ---
 
-### Task 2: Add a pure balance-runtime helper with tests
+### Task 2: Add a pure balance-runtime helper
 
 **Files:**
 - Create: `balance_runtime.lua`
 - Create: `tests/test_balance_runtime.lua`
-- Modify: `main.lua:1-50`, `main.lua:2918-3040`
+- Modify: `main.lua:1-55`, `main.lua:2918-3040`
 
 **Interfaces:**
-- Consumes: plain snapshot tables generated by `main.lua`.
-- Produces: `DT.balance_runtime` with these exact functions:
+- Produces `DT.balance_runtime` with exact functions:
   - `reset_blind_state(game) -> nil`
   - `mark_consumable_used(game, set) -> nil`
   - `used_type_count(game) -> integer`
   - `condition_passes(condition, data) -> boolean`
   - `factor(per, data, cap) -> number`
   - `choice_index(roll, count) -> integer`
-  - `resolve_choice(effect, roll) -> table|nil` where result is `{stat=<string>, amount=<number>}`.
+  - `resolve_choice(effect, roll) -> {stat:string, amount:number}|nil`
 
-- [ ] **Step 1: Write the failing unit test**
+- [ ] **Step 1: Write the failing test**
 
 ```lua
 local R = dofile('balance_runtime.lua')
-
 local game = {}
 R.reset_blind_state(game)
-assert(next(game.dt_consumable_types_used) == nil)
 R.mark_consumable_used(game, 'Tarot')
 R.mark_consumable_used(game, 'Spectral')
 assert(R.used_type_count(game) == 2)
 
-local data = {
-  hands_left = 5, resource_total = 12, tags = 14, empty_joker_slots = 7,
-  used_types = {Tarot = true, Spectral = true}, used_type_count = 2,
-  boss = true, hand_level = 10, numbered = 5, played_cards = 5,
+local d = {
+  after_discard=true, discards_left=0, hands_left=5, hands_played=0,
+  resource_total=12, dollars=100, jokers=3, joker_limit=7,
+  empty_joker_slots=4, consumables=3, types={Tarot=true,Planet=true,Spectral=true},
+  type_count=3, used_types={Tarot=true,Spectral=true}, used_type_count=2,
+  hand_level=10, enhanced=5, numbered=5, faces=0, hearts=3, spades=2,
+  tags=12, hand_cards=5, hand_limit=8, played_cards=5, boss=true, flush=true,
 }
-assert(R.condition_passes({type='used_tarot'}, data))
-assert(R.condition_passes({type='used_type_count_at_least', value=2}, data))
-assert(not R.condition_passes({type='used_all_consumable_types'}, data))
-assert(R.factor('resource_total', data, 8) == 8)
-assert(R.factor('tags', data, 8) == 8)
-assert(R.factor('empty_joker_slots', data, 5) == 5)
-assert(R.choice_index(0.00, 4) == 1)
-assert(R.choice_index(0.26, 4) == 2)
-assert(R.choice_index(0.99, 4) == 4)
-local resolved = R.resolve_choice({choices={{stat='chips',amount=240},{stat='mult',amount=48},{stat='xmult',amount=2.5}}}, 0.40)
-assert(resolved.stat == 'mult' and resolved.amount == 48)
+assert(R.condition_passes({type='after_discard'}, d))
+assert(R.condition_passes({type='used_tarot'}, d))
+assert(R.condition_passes({type='used_spectral'}, d))
+assert(not R.condition_passes({type='used_planet'}, d))
+assert(R.condition_passes({type='used_type_count_at_least',value=2}, d))
+assert(not R.condition_passes({type='used_all_consumable_types'}, d))
+assert(R.factor('resource_total', d, 8) == 8)
+assert(R.factor('tags', d, 8) == 8)
+assert(R.factor('empty_joker_slots', d, 3) == 3)
+assert(R.choice_index(0.00,4) == 1)
+assert(R.choice_index(0.26,4) == 2)
+assert(R.choice_index(0.99,4) == 4)
+local c = R.resolve_choice({choices={{stat='chips',amount=240},{stat='mult',amount=48},{stat='xmult',amount=2.5}}},0.40)
+assert(c.stat == 'mult' and c.amount == 48)
 print('balance runtime OK')
 ```
 
-- [ ] **Step 2: Run it and verify it fails because `balance_runtime.lua` does not exist**
+- [ ] **Step 2: Run and confirm missing-module failure**
 
 ```bash
 texlua tests/test_balance_runtime.lua
 ```
 
-Expected: FAIL loading `balance_runtime.lua`.
+- [ ] **Step 3: Implement `balance_runtime.lua`**
 
-- [ ] **Step 3: Implement the pure helper**
-
-`balance_runtime.lua` must contain the full existing condition vocabulary plus the new `used_tarot`, `used_planet`, `used_spectral`, `used_type_count_at_least`, and `used_all_consumable_types` conditions. `factor` must preserve current defaults but use the supplied `cap` when present. `resolve_choice` must choose exactly one entry from `effect.choices` using `choice_index`.
-
-Core required implementation:
+Use this exact state/choice skeleton:
 
 ```lua
 local R = {}
+local function n(v) return tonumber(v) or 0 end
+local function capped(v, cap) return math.min(cap, math.max(0, n(v))) end
 
 function R.reset_blind_state(game)
   game.dt_consumable_types_used = {}
@@ -158,23 +154,90 @@ function R.used_type_count(game)
 end
 
 function R.choice_index(roll, count)
-  count = math.max(1, math.floor(tonumber(count) or 1))
-  roll = math.max(0, math.min(0.999999999, tonumber(roll) or 0))
+  count = math.max(1, math.floor(n(count)))
+  roll = math.max(0, math.min(0.999999999, n(roll)))
   return math.floor(roll * count) + 1
 end
 
 function R.resolve_choice(effect, roll)
   local choices = effect and effect.choices or {}
-  if #choices == 0 then return nil end
   local choice = choices[R.choice_index(roll, #choices)]
   if not choice then return nil end
-  return {stat = choice.stat, amount = tonumber(choice.amount) or 0}
+  return {stat=choice.stat, amount=n(choice.amount)}
+end
+```
+
+Implement `condition_passes` with every existing v1.7.15 condition plus the new use-state conditions:
+
+```lua
+function R.condition_passes(c, d)
+  if not c then return true end
+  local k, v = c.type, n(c.value)
+  if k == 'after_discard' then return d.after_discard == true end
+  if k == 'no_discards' then return d.discards_left <= 0 end
+  if k == 'first_hand' then return d.hands_played <= 0 end
+  if k == 'final_hand' then return d.hands_left <= 0 end
+  if k == 'boss' then return d.boss == true end
+  if k == 'hands_left_at_least' then return d.hands_left >= v end
+  if k == 'hands_left_at_most' then return d.hands_left <= v end
+  if k == 'discards_left_at_least' then return d.discards_left >= v end
+  if k == 'resource_total_at_least' then return d.resource_total >= v end
+  if k == 'dollars_at_least' then return d.dollars >= v end
+  if k == 'dollars_below' then return d.dollars < v end
+  if k == 'jokers_at_least' then return d.jokers >= v end
+  if k == 'jokers_at_most' then return d.jokers <= v end
+  if k == 'joker_full' then return d.joker_limit > 0 and d.jokers >= d.joker_limit end
+  if k == 'consumables_at_least' then return d.consumables >= v end
+  if k == 'holds_tarot' then return d.types.Tarot == true end
+  if k == 'holds_planet' then return d.types.Planet == true end
+  if k == 'holds_spectral' then return d.types.Spectral == true end
+  if k == 'type_count_at_least' then return d.type_count >= v end
+  if k == 'used_tarot' then return d.used_types.Tarot == true end
+  if k == 'used_planet' then return d.used_types.Planet == true end
+  if k == 'used_spectral' then return d.used_types.Spectral == true end
+  if k == 'used_type_count_at_least' then return d.used_type_count >= v end
+  if k == 'used_all_consumable_types' then return d.used_type_count >= 3 end
+  if k == 'hand_level_at_least' then return d.hand_level >= v end
+  if k == 'enhanced_at_least' then return d.enhanced >= v end
+  if k == 'all_enhanced_five' then return d.played_cards == 5 and d.enhanced == 5 end
+  if k == 'no_faces' then return d.faces == 0 end
+  if k == 'all_numbered_five' then return d.played_cards == 5 and d.numbered == 5 end
+  if k == 'numbered_at_least' then return d.numbered >= v end
+  if k == 'hearts_and_spades' then return d.hearts > 0 and d.spades > 0 end
+  if k == 'all_heart_spade_five' then return d.played_cards == 5 and d.hearts + d.spades == 5 end
+  if k == 'flush' then return d.flush == true end
+  if k == 'played_cards_at_least' then return d.played_cards >= v end
+  if k == 'hand_cards_at_least' then return d.hand_cards >= v end
+  if k == 'hand_limit_at_least' then return d.hand_limit >= v end
+  if k == 'tags_at_least' then return d.tags >= v end
+  return true
+end
+```
+
+Implement factor defaults exactly as v1.7.15, with `cap` overriding the default maximum:
+
+```lua
+function R.factor(per, d, cap)
+  local values = {
+    hands_left=d.hands_left, discards_left=d.discards_left, resource_total=d.resource_total,
+    discards_used=d.discards_used, dollars_10=math.floor(n(d.dollars)/10), jokers=d.jokers,
+    empty_joker_slots=d.empty_joker_slots, consumables=d.consumables, hand_level=d.hand_level,
+    enhanced=d.enhanced, numbered=d.numbered, hearts=d.hearts, spades=d.spades,
+    type_count=d.type_count, hand_cards=d.hand_cards, tags=d.tags, played_cards=d.played_cards,
+  }
+  local defaults = {
+    hands_left=8, discards_left=8, resource_total=12, discards_used=8, dollars_10=20,
+    jokers=10, empty_joker_slots=6, consumables=8, hand_level=20, enhanced=5,
+    numbered=5, hearts=5, spades=5, type_count=3, hand_cards=12, tags=12, played_cards=5,
+  }
+  if not values[per] then return 1 end
+  return capped(values[per], n(cap) > 0 and n(cap) or defaults[per])
 end
 
 return R
 ```
 
-- [ ] **Step 4: Load the helper in `main.lua` after `deck_expansion.lua` and route condition/factor calls through it**
+- [ ] **Step 4: Load it in `main.lua` and route condition/factor wrappers through it**
 
 ```lua
 local balance_runtime_chunk = SMODS.load_file('balance_runtime.lua')
@@ -182,107 +245,87 @@ if not balance_runtime_chunk then error('Deck Talents could not load balance_run
 DT.balance_runtime = balance_runtime_chunk()
 ```
 
-- [ ] **Step 5: Run the unit test and Lua parser**
+- [ ] **Step 5: Test, parse, commit**
 
 ```bash
 texlua tests/test_balance_runtime.lua
 texluac -p balance_runtime.lua
 texluac -p main.lua
-```
-
-Expected: all pass.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add balance_runtime.lua tests/test_balance_runtime.lua main.lua
 git commit -m "test: isolate balance runtime rules"
 ```
 
 ---
 
-### Task 3: Integrate per-Blind consumable state, caps, and deterministic choice effects
+### Task 3: Integrate per-Blind state, caps, and deterministic choice effects
 
 **Files:**
 - Modify: `main.lua:2918-3310`, `main.lua:3839-3970`
-- Create: `tests/test_balance_effect_schema.lua`
+- Create: `tests/test_balance_runtime_integration.py`
 
 **Interfaces:**
-- Consumes: `DT.balance_runtime` from Task 2.
-- Produces: effect schema support for optional `cap`, `stat='choice_xmult'`, and `stat='choice_score'` with `choices` arrays.
+- Consumes: `DT.balance_runtime`.
+- Produces: optional effect `cap`, `choice_xmult`, and `choice_score` handling.
 
-- [ ] **Step 1: Write a failing schema test**
+- [ ] **Step 1: Write a failing source-contract test**
 
-```lua
-DeckTalents = {}
-dofile('talents.lua')
-dofile('deck_expansion.lua')
-
-local function find(deck, id)
-  for _, t in ipairs(DeckTalents.deck_expansion[deck] or {}) do
-    if t.id == id then return t end
-  end
-end
-
--- These assertions intentionally fail until later deck tasks populate the schema.
-assert(find('b_erratic','absolute_pandemonium') ~= nil)
-print('effect schema loader OK')
+```python
+from pathlib import Path
+s = Path('main.lua').read_text(encoding='utf-8')
+for needle in [
+    'effect.cap', 'dt_consumable_types_used', 'dt_expansion_hand_choices',
+    "effect.stat == 'choice_xmult'", "effect.stat == 'choice_score'",
+    'DT.balance_runtime.mark_consumable_used', 'DT.balance_runtime.reset_blind_state',
+]:
+    assert needle in s, needle
+print('balance runtime integration OK')
 ```
 
-- [ ] **Step 2: Add runtime state to `expansion_data(context)`**
+- [ ] **Step 2: Run and confirm failure on the new integration needles**
 
-Add:
-
-```lua
-local used_types = G and G.GAME and G.GAME.dt_consumable_types_used or {}
-data.used_types = used_types
-data.used_type_count = DT.balance_runtime.used_type_count(G and G.GAME or {})
+```bash
+python tests/test_balance_runtime_integration.py
 ```
 
-Also put `after_discard = G.GAME.dt_discarded_this_blind == true` into the snapshot so `condition_passes` is pure.
+- [ ] **Step 3: Add runtime snapshot fields**
 
-- [ ] **Step 3: Reset and mark consumable state in `MOD.calculate`**
-
-At `context.setting_blind` call:
-
-```lua
-DT.balance_runtime.reset_blind_state(G.GAME)
-```
-
-At `context.using_consumeable`, before applying effects:
-
-```lua
-DT.balance_runtime.mark_consumable_used(G.GAME, set)
-```
-
-- [ ] **Step 4: Make per-effect caps authoritative**
-
-Change factor calls to:
+`expansion_data(context)` adds `after_discard`, `used_types`, and `used_type_count`. Every scoring/cashout/Boss factor call becomes:
 
 ```lua
 local factor = DT.balance_runtime.factor(effect.per, data, effect.cap)
 ```
 
-Use the same call for scoring, cashout, and Boss effects.
+- [ ] **Step 4: Reset and mark per-Blind consumable state**
 
-- [ ] **Step 5: Add deterministic per-hand choice resolution**
+At `context.setting_blind`:
 
-Cache a single roll under `G.GAME.dt_expansion_hand_choices[key]`, where `key` includes talent ID, effect index, Ante, Blind name, and `hands_played`. Repeated scoring evaluations of the same hand must return the cached roll rather than consume another random result.
-
-For `choice_xmult`, multiply by the chosen amount. For `choice_score`, apply exactly one chosen Chips, Mult, or XMult result.
-
-- [ ] **Step 6: Parse and run tests**
-
-```bash
-texlua tests/test_balance_runtime.lua
-texlua tests/test_balance_effect_schema.lua
-texluac -p main.lua
+```lua
+DT.balance_runtime.reset_blind_state(G.GAME)
 ```
 
-- [ ] **Step 7: Commit**
+At `context.using_consumeable`, after determining `set` and before talent effects:
+
+```lua
+DT.balance_runtime.mark_consumable_used(G.GAME, set)
+```
+
+- [ ] **Step 5: Cache one random choice per talent/effect/hand**
+
+Use key format:
+
+```lua
+local key = table.concat({talent.id,index,ante,blind_name,data.hands_played}, ':')
+```
+
+If `G.GAME.dt_expansion_hand_choices[key]` exists, reuse it. Otherwise call `expansion_random`, convert the roll through `DT.balance_runtime.choice_index`, and store the chosen index. `choice_xmult` applies the selected numeric multiplier; `choice_score` resolves exactly one selected `{stat, amount}` entry.
+
+- [ ] **Step 6: Test, parse, commit**
 
 ```bash
-git add main.lua tests/test_balance_effect_schema.lua
+python tests/test_balance_runtime_integration.py
+texlua tests/test_balance_runtime.lua
+texluac -p main.lua
+git add main.lua tests/test_balance_runtime_integration.py
 git commit -m "feat: add per-blind and discrete balance runtime"
 ```
 
@@ -293,64 +336,52 @@ git commit -m "feat: add per-blind and discrete balance runtime"
 **Files:**
 - Modify: `talents.lua:61-216`
 - Modify: `deck_expansion.lua:230-1111`
-- Modify: `main.lua` base scoring/live-preview branches for `b_blue`, `b_yellow`, `b_green`, `b_black`
+- Modify: `main.lua` base scoring/live-preview branches for these decks
 - Create: `tests/test_balance_resource_decks.lua`
 
 **Interfaces:**
-- Consumes: cap support and runtime conditions from Tasks 2-3.
-- Produces: exact resource/Joker behavior from the approved spec.
+- Produces exact approved targets for resource/Joker decks.
 
-- [ ] **Step 1: Write the failing data assertions**
-
-The test must assert these exact headline values/effects by talent ID:
+- [ ] **Step 1: Write failing assertions for these exact targets**
 
 ```lua
 local expected = {
-  azure_infinity = {chips_per_hands_left=40, xmult=2.0, first_hand=true, min_hands=4},
-  endless_shift = {xmult=1.60, min_hands=2},
-  golden_singularity = {boss_dollars=15, threshold=100, xmult=2.25},
-  money_printer = {cashout=4, threshold=100, xmult=1.60},
-  liquid_assets = {threshold=75, xmult=1.40},
-  hostile_takeover = {threshold=50, boss=true, xmult=1.65},
-  planet_saver = {xmult_per_resource=0.08, score_cap=8, cashout_per_resource=1, cashout_cap=6},
-  perpetual_motion = {xmult_per_resource=0.05, cap=8},
-  void_storage = {chips_per_empty_joker=20, cap=4},
-  black_hole = {max_jokers=3, mult_per_empty_joker=12, cap=4},
-  full_darkness = {xmult=1.35},
-  abyssal_crown = {joker_slots=1, mult_per_joker=10, xmult_bonus_per_empty=0.12, cap=5},
+  azure_infinity={chips_per_hands_left=40,xmult=2.0,first_hand=true,min_hands=4},
+  endless_shift={xmult=1.60,min_hands=2},
+  golden_singularity={boss_dollars=15,threshold=100,xmult=2.25},
+  money_printer={cashout=4,threshold=100,xmult=1.60},
+  liquid_assets={threshold=75,xmult=1.40},
+  hostile_takeover={threshold=50,boss=true,xmult=1.65},
+  planet_saver={xmult_per_resource=0.08,score_cap=8,cashout_per_resource=1,cashout_cap=6},
+  perpetual_motion={xmult_per_resource=0.05,cap=8},
+  compost_dividend={cashout_cap=6}, carbon_credit={boss_cap=10},
+  void_storage={chips_per_empty_joker=20,cap=4},
+  black_hole={max_jokers=3,mult_per_empty_joker=12,cap=4},
+  full_darkness={xmult=1.35}, event_horizon={max_jokers=4,xmult=1.45},
+  singularity_storage={joker_slots=1,max_jokers=4,xmult=1.55},
+  abyssal_crown={joker_slots=1,mult_per_joker=10,xmult_bonus_per_empty=0.12,cap=5},
 }
 ```
 
-- [ ] **Step 2: Run the test and verify failures against v1.7.15 values**
+The test loads `talents.lua` and `deck_expansion.lua`, finds each ID, and asserts its conditions/effects rather than only matching description text.
+
+- [ ] **Step 2: Run and confirm v1.7.15 mismatches**
 
 ```bash
 texlua tests/test_balance_resource_decks.lua
 ```
 
-- [ ] **Step 3: Update `talents.lua` descriptions and base behavior values**
+- [ ] **Step 3: Update data tables, base scoring, and live previews**
 
-Keep every ID and requirement edge unchanged. Do not alter Red entries.
+Keep IDs/requirements unchanged. Encode all listed resource/Joker caps with `effect.cap`. Azure Infinity uses `first_hand` plus `hands_left_at_least=4`.
 
-- [ ] **Step 4: Update the matching `deck_expansion.lua` effect tables**
-
-Represent hard caps with `cap=<integer>` on the effect itself. Azure Infinity uses `first_hand` + `hands_left_at_least=4`; it does not need a mutable once-token because no later hand can satisfy `first_hand`.
-
-- [ ] **Step 5: Update base live previews and scoring branches in `main.lua`**
-
-Make the displayed threshold/cap values exactly match the tables.
-
-- [ ] **Step 6: Run tests and parse**
+- [ ] **Step 4: Test, parse, commit**
 
 ```bash
 texlua tests/test_balance_resource_decks.lua
 texluac -p talents.lua
 texluac -p deck_expansion.lua
 texluac -p main.lua
-```
-
-- [ ] **Step 7: Commit**
-
-```bash
 git add talents.lua deck_expansion.lua main.lua tests/test_balance_resource_decks.lua
 git commit -m "balance: retune resource and joker decks"
 ```
@@ -362,33 +393,31 @@ git commit -m "balance: retune resource and joker decks"
 **Files:**
 - Modify: `talents.lua:217-333`, `talents.lua:412-450`
 - Modify: `deck_expansion.lua:1112-1774`, `deck_expansion.lua:2227-2454`
-- Modify: `main.lua` base scoring/live-preview branches
+- Modify: `main.lua` matching base scoring/live-preview branches
 - Create: `tests/test_balance_arcane_decks.lua`
 
 **Interfaces:**
-- Consumes: runtime `used_*` conditions.
-- Produces: Magic use-based identity, Ghost Spectral-use identity, Nebula level caps, Zodiac held-type identity.
+- Consumes: `used_*` conditions.
+- Produces use-based Magic/Ghost, leveled Nebula, held-type Zodiac.
 
-- [ ] **Step 1: Add failing assertions for the approved values**
+- [ ] **Step 1: Write failing exact-value tests**
 
-Include at minimum:
+Assert the approved spec values for every explicitly named talent, including:
 
 ```lua
-local expected = {
-  is_this_your_card = {condition='used_tarot', mult=20},
-  rabbit_hole = {condition='used_planet', chips=80},
-  grand_illusion = {condition='used_type_count_at_least', value=2, xmult=1.50},
-  impossible_act = {condition='used_all_consumable_types', chips=120, mult=40, xmult=2.25},
-  space_dust = {chips_per_level=12, cap=20},
-  telescope_two = {mult_per_level=3},
-  heat_death = {min_level=10, chips_per_level=25, xmult=2.10},
-  spirit_cabinet = {condition='used_spectral', mult=40},
-  phantom_hand = {condition='used_spectral', xmult=1.50},
-  beyond_the_veil = {condition='used_spectral+all_enhanced_five', chips_per_enhanced=30, xmult=2.40},
-  mercury_gatorade = {chips_per_type=15},
-  big_three = {held_types=3, xmult=1.60},
-  grand_zodiac = {chips_per_type=60, held_types=3, xmult=2.25},
-}
+is_this_your_card={condition='used_tarot',mult=20}
+rabbit_hole={condition='used_planet',chips=80}
+grand_illusion={used_types=2,xmult=1.50}
+impossible_act={used_all=true,chips=120,mult=40,xmult=2.25}
+space_dust={chips_per_level=12,cap=20}
+telescope_two={mult_per_level=3}
+heat_death={min_level=10,chips_per_level=25,xmult=2.10}
+spirit_cabinet={condition='used_spectral',mult=40}
+phantom_hand={condition='used_spectral',xmult=1.50}
+beyond_the_veil={used_spectral=true,all_enhanced_five=true,chips_per_enhanced=30,xmult=2.40}
+mercury_gatorade={chips_per_type=15}
+big_three={held_types=3,xmult=1.60}
+grand_zodiac={chips_per_type=60,held_types=3,xmult=2.25}
 ```
 
 - [ ] **Step 2: Run and confirm failures**
@@ -397,28 +426,19 @@ local expected = {
 texlua tests/test_balance_arcane_decks.lua
 ```
 
-- [ ] **Step 3: Implement Magic/Ghost runtime conditions using the per-Blind flags**
+- [ ] **Step 3: Apply the table and base-scoring changes**
 
-For base Ghost `paranormal_activity`, replace passive held-Spectral behavior with `X1.35 after using a Spectral this Blind`; this is the entry multiplicative reward and prevents the old passive X2 stack from surviving the redesign.
+Base Ghost `paranormal_activity` becomes `X1.35 after using a Spectral this Blind`; it no longer checks held Spectral cards. Other unnamed talents keep v1.7.15 behavior.
 
-- [ ] **Step 4: Apply the exact Nebula and Zodiac targets from the spec**
-
-Any talent not explicitly named in the spec keeps its existing effect and ID in this first pass.
-
-- [ ] **Step 5: Run tests and parse**
+- [ ] **Step 4: Test, parse, commit**
 
 ```bash
 texlua tests/test_balance_arcane_decks.lua
 texluac -p talents.lua
 texluac -p deck_expansion.lua
 texluac -p main.lua
-```
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add talents.lua deck_expansion.lua main.lua tests/test_balance_arcane_decks.lua
-git commit -m "balance: differentiate magic ghost nebula and zodiac"
+git commit -m "balance: differentiate arcane and level decks"
 ```
 
 ---
@@ -432,12 +452,26 @@ git commit -m "balance: differentiate magic ghost nebula and zodiac"
 - Create: `tests/test_balance_pattern_decks.lua`
 
 **Interfaces:**
-- Consumes: existing numbered/flush/hand-card/tag snapshot fields plus per-effect caps.
-- Produces: meaningful numbered-card, two-suit, reserve-hand, and Tag-hoarding triggers.
+- Produces numbered-card, two-suit, reserve-hand, and Tag-hoarding behavior from the spec.
 
-- [ ] **Step 1: Write failing assertions**
+- [ ] **Step 1: Write failing effect-table assertions**
 
-Assert the exact approved targets, including `kids_table` 4+ numbered/+20 Mult, `quiet_classroom` five numbered/X1.50, `lord_of_the_flies` +80/X2.40, `checker_mate` X1.25, `full_board` X1.50, `perfect_checkmate` +60/X2.10, `gallery_expansion` +10 Mult per empty Joker slot capped 3, `magnum_opus` +12 Mult per remaining hand card + X2.25, `infinite_labels` +0.08 XMult bonus per Tag capped 8, and `printing_press` +0.10 per Tag capped 8 plus one Boss Double Tag.
+Assert every explicitly named target from the spec, including:
+
+```lua
+kids_table={numbered_at_least=4,mult=20}
+quiet_classroom={all_numbered_five=true,xmult=1.50}
+lord_of_the_flies={all_numbered_five=true,mult=80,xmult=2.40}
+checker_mate={hearts_and_spades=true,xmult=1.25}
+full_board={flush=true,xmult=1.50}
+perfect_checkmate={flush=true,mult=60,xmult=2.10}
+gallery_expansion={mult_per_empty_joker=10,cap=3}
+magnum_opus={played_cards=5,min_hand_cards=4,mult_per_hand_card=12,xmult=2.25}
+infinite_labels={xmult_bonus_per_tag=0.08,cap=8}
+printing_press={boss_double_tags=1,xmult_bonus_per_tag=0.10,cap=8}
+```
+
+Also assert `echo_copy.chance == 0.50` and `duplicate_everything` produces exactly one Double Tag.
 
 - [ ] **Step 2: Run and confirm failures**
 
@@ -445,26 +479,17 @@ Assert the exact approved targets, including `kids_table` 4+ numbered/+20 Mult, 
 texlua tests/test_balance_pattern_decks.lua
 ```
 
-- [ ] **Step 3: Replace trivial no-face checks with numbered-card conditions**
+- [ ] **Step 3: Apply exact data/scoring/preview changes**
 
-Use existing `numbered_at_least` and `all_numbered_five`; remove no-face conditions only from talents named in the approved spec.
+Use `numbered_at_least`/`all_numbered_five` instead of no-face checks only where the spec names the replacement. Use `effect.cap=8` for Tag multipliers.
 
-- [ ] **Step 4: Apply Checkered/Painted/Anaglyph target tables and caps**
-
-`Duplicate Everything` must produce exactly one Double Tag. `Echo Copy` must use `chance=0.50` rather than guaranteed generation.
-
-- [ ] **Step 5: Run tests and parse**
+- [ ] **Step 4: Test, parse, commit**
 
 ```bash
 texlua tests/test_balance_pattern_decks.lua
 texluac -p talents.lua
 texluac -p deck_expansion.lua
 texluac -p main.lua
-```
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add talents.lua deck_expansion.lua main.lua tests/test_balance_pattern_decks.lua
 git commit -m "balance: retune pattern hand and tag decks"
 ```
@@ -476,29 +501,35 @@ git commit -m "balance: retune pattern hand and tag decks"
 **Files:**
 - Modify: `talents.lua:529-606`
 - Modify: `deck_expansion.lua:2877-3310`
-- Modify: `main.lua` Plasma/Erratic base scoring and expansion scoring cases
+- Modify: `main.lua` Plasma/Erratic base scoring/live preview
 - Create: `tests/test_balance_plasma_erratic.lua`
 
 **Interfaces:**
-- Consumes: `choice_xmult`, `choice_score`, cached per-hand choices.
-- Produces: additive Plasma identity and mutually-exclusive Erratic outcomes.
+- Consumes: `choice_xmult`, `choice_score`.
+- Produces additive Plasma identity and mutually-exclusive Erratic outcomes.
 
-- [ ] **Step 1: Write failing exact-value tests**
+- [ ] **Step 1: Write failing exact tests**
 
-The Plasma table must assert all approved additive values through `Star Core` (+240 Chips/+48 Mult, final hand X1.80). The Erratic table must assert:
+Assert all Plasma values from the spec through:
 
 ```lua
-rngesus.choices = {1.0, 1.5, 2.0, 2.5}
-unstable_reality.choices = {1.0, 1.5, 2.0, 2.5}
-house_always_loses.choices = {1.5, 2.0, 2.5, 3.0}
-absolute_pandemonium.choices = {
-  {stat='chips', amount=240},
-  {stat='mult', amount=48},
-  {stat='xmult', amount=2.5},
+star_core={chips=240,mult=48,final_hand_xmult=1.80}
+```
+
+Assert Erratic arrays exactly:
+
+```lua
+rngesus={1.0,1.5,2.0,2.5}
+unstable_reality={1.0,1.5,2.0,2.5}
+house_always_loses={1.5,2.0,2.5,3.0}
+absolute_pandemonium={
+  {stat='chips',amount=240},
+  {stat='mult',amount=48},
+  {stat='xmult',amount=2.5},
 }
 ```
 
-and a Boss `talent_point` effect with `chance=0.20`, `amount=1`.
+and assert its Boss `talent_point` effect has `chance=0.20`, `amount=1`.
 
 - [ ] **Step 2: Run and confirm failures**
 
@@ -506,120 +537,105 @@ and a Boss `talent_point` effect with `chance=0.20`, `amount=1`.
 texlua tests/test_balance_plasma_erratic.lua
 ```
 
-- [ ] **Step 3: Remove old unconditional Plasma XMult from base scoring**
+- [ ] **Step 3: Remove old unconditional Plasma XMult and implement discrete Erratic choices**
 
-`equal_rights` and `fusion_reactor` become additive only. Keep XMult only on the approved conditional late talents.
+`Equal Rights` and `Fusion Reactor` become additive only. `Absolute Pandemonium` is one `choice_score` effect, not three independent random effects.
 
-- [ ] **Step 4: Implement Erratic discrete choice effects**
-
-Use one cached choice per hand/effect. `Absolute Pandemonium` must resolve exactly one scoring outcome, never three independent rolls.
-
-- [ ] **Step 5: Run tests repeatedly to prove deterministic resolution**
+- [ ] **Step 4: Test, parse, commit**
 
 ```bash
-for i in 1 2 3 4 5; do texlua tests/test_balance_runtime.lua; done
 texlua tests/test_balance_plasma_erratic.lua
+python tests/test_balance_runtime_integration.py
+texluac -p talents.lua
+texluac -p deck_expansion.lua
 texluac -p main.lua
-```
-
-Expected: identical passing results every run.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add talents.lua deck_expansion.lua main.lua tests/test_balance_plasma_erratic.lua
 git commit -m "balance: rebuild plasma and erratic identities"
 ```
 
 ---
 
-### Task 8: Synchronize live previews, docs, and persistence regressions
+### Task 8: Synchronize previews, docs, and profile regression
 
 **Files:**
-- Modify: `main.lua` preview helpers around the expansion/base preview code
-- Modify: `NEW_DECK_TALENTS.md`
-- Modify: `LEGENDARY_TALENTS.md`
-- Modify: `README.md`
-- Modify: `CHANGELOG.md`
+- Modify: `main.lua` preview helpers
+- Modify: `README.md`, `CHANGELOG.md`, `NEW_DECK_TALENTS.md`, `LEGENDARY_TALENTS.md`
 - Create: `tests/test_profile_progression.lua`
 - Create: `tests/test_docs_values.py`
 
 **Interfaces:**
-- Consumes: final balance tables from Tasks 4-7.
-- Produces: matching runtime previews/docs and a regression test for profile isolation.
+- Produces matching gameplay text and regression coverage.
 
-- [ ] **Step 1: Add a profile regression harness**
+- [ ] **Step 1: Add the profile regression harness**
 
-Test legacy migration to active profile, switching Profile 1/2, awarding points independently, and resetting only the active profile. Reuse the v1.7.14 behavior contract: Profile 2 data must survive switching to Profile 1 and back.
+The harness must prove: legacy shared config migrates to active Profile 2; Profile 2 points/unlocks survive switching to Profile 1; Profile 1 can gain points independently; resetting Profile 2 leaves Profile 1 unchanged.
 
-- [ ] **Step 2: Add documentation value checks**
+- [ ] **Step 2: Add exact documentation assertions**
 
-`tests/test_docs_values.py` must scan for the exact headline strings for `Azure Infinity`, `Golden Singularity`, `Impossible Act`, `Heat Death`, `Beyond the Veil`, `Lord of the Flies`, `Perfect Checkmate`, `Grand Zodiac`, `Magnum Opus`, `Printing Press`, `Star Core`, and `Absolute Pandemonium` in both data descriptions and the relevant Markdown docs.
+`tests/test_docs_values.py` checks headline strings for Azure Infinity, Golden Singularity, Planet Saver, Abyssal Crown, Impossible Act, Heat Death, Beyond the Veil, Lord of the Flies, Perfect Checkmate, Grand Zodiac, Magnum Opus, Printing Press, Star Core, and Absolute Pandemonium in the relevant Markdown and data files.
 
-- [ ] **Step 3: Update live previews**
+- [ ] **Step 3: Update live preview logic**
 
-For Ante-scaled effects show current scaled value; for conditions show `CURRENT: CONDITION NOT MET` until true. New use-based Magic/Ghost previews must consult `used_types`, not held consumables.
+Magic/Ghost preview conditions use `used_types`; capped talents display the capped current value; Ante-scaled effects show current scaled value and Ante-8 reference data for the UI plan.
 
-- [ ] **Step 4: Update docs and changelog**
-
-Document all redesigns without changing talent IDs. Explicitly state that existing purchases remain owned after updating.
-
-- [ ] **Step 5: Run regression tests**
+- [ ] **Step 4: Run tests and commit**
 
 ```bash
 texlua tests/test_profile_progression.lua
 python tests/test_docs_values.py
-```
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add main.lua README.md CHANGELOG.md NEW_DECK_TALENTS.md LEGENDARY_TALENTS.md tests
+texluac -p main.lua
+git add main.lua README.md CHANGELOG.md NEW_DECK_TALENTS.md LEGENDARY_TALENTS.md tests/test_profile_progression.lua tests/test_docs_values.py
 git commit -m "docs: synchronize balanced talent behavior"
 ```
 
 ---
 
-### Task 9: Static validation and balance release checkpoint
+### Task 9: Static validation checkpoint
 
 **Files:**
-- Modify only if validation reveals a defect in files changed by Tasks 1-8.
 - Create: `.luacheckrc`
 - Create: `docs/validation/2026-09-01-balance-runtime.md`
 
 **Interfaces:**
-- Consumes: all balance/runtime work.
-- Produces: a clean, testable balance checkpoint for the UI plan.
+- Produces a green balance/runtime checkpoint consumed by the UI plan.
 
-- [ ] **Step 1: Install/use the supplied Luacheck package in the worktree tool environment**
+- [ ] **Step 1: Verify the supplied Luacheck package**
 
-Artifact: `/mnt/data/luacheck-1.2.0.zip`, SHA-256 `955a172a64dfaceb52d824ca71aab7cbdf4a89012a24164870600800a350e96b`.
+```bash
+sha256sum /mnt/data/luacheck-1.2.0.zip
+```
 
-- [ ] **Step 2: Add `.luacheckrc` for known framework globals**
+Expected: `955a172a64dfaceb52d824ca71aab7cbdf4a89012a24164870600800a350e96b`.
 
-Allow the intentional Balatro/Steamodded globals (`SMODS`, `G`, `Event`, `Tag`, `Card`, `UIBox`, `love`, `DeckTalents`, `pseudorandom`, `ease_dollars`, `add_tag`, `play_sound`, `attention_text`, `to_number`) but do not globally suppress unused locals, redefinitions, or undefined variable warnings.
+- [ ] **Step 2: Add `.luacheckrc`**
 
-- [ ] **Step 3: Run every automated check**
+```lua
+std = 'lua51'
+globals = {
+  'SMODS','G','Event','Tag','Card','UIBox','love','DeckTalents','pseudorandom',
+  'ease_dollars','add_tag','play_sound','attention_text','to_number'
+}
+```
+
+Do not globally suppress unused locals, redefinitions, or undefined variables.
+
+- [ ] **Step 3: Run all checks**
 
 ```bash
 find . -maxdepth 1 -name '*.lua' -print0 | xargs -0 -n1 texluac -p
 for t in tests/test_*.lua; do texlua "$t"; done
-python tests/test_docs_values.py
+for t in tests/test_*.py; do python "$t"; done
 python -m json.tool DeckTalents.json >/dev/null
 luacheck *.lua tests/*.lua
 ```
 
-Expected: parser/tests/JSON pass; Luacheck has no newly introduced undefined-variable or accidental-global errors.
+- [ ] **Step 4: Record command, exit code, and any intentionally retained pre-existing warnings in the validation note**
 
-- [ ] **Step 4: Record exact outputs in the validation note**
-
-Include command, exit code, and any intentionally ignored pre-existing warnings.
-
-- [ ] **Step 5: Commit the balance checkpoint**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add .luacheckrc docs/validation/2026-09-01-balance-runtime.md
 git commit -m "test: validate full balance runtime pass"
 ```
 
-At this point the branch is the required input to `docs/superpowers/plans/2026-09-01-deck-talents-ui-pass.md`; do not package the final v1.8.0 release until the UI plan passes its performance regression.
+This commit is the required input to `docs/superpowers/plans/2026-09-01-deck-talents-ui-pass.md`. Do not package the final release before the UI/performance plan passes.
