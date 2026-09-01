@@ -19,34 +19,31 @@
 - Do not create new nested UIBox trees for the left rail, top header, right inspector, Help, or Settings.
 - Direct HUD hitboxes stay plain Lua tables.
 - Decorative animation is bounded and may not allocate persistent objects every frame.
-- Inspector model/cache invalidates only on selection, profile, Ante, relevant run-state change, or explicit Help/Settings mode change.
-- Screen geometry remains usable in Android landscape and scales from the existing `screen_scale1713` behavior.
-- Existing constellation talent routes/positions are not rearranged in this pass.
+- Inspector cache invalidates only on selection, profile, Ante, relevant run-state change, or Help/Settings mode change.
+- Android landscape remains the target; geometry scales from a 1920×1080 reference using the existing direct-HUD scaling approach.
+- Existing constellation talent routes/positions are not rearranged.
 - Existing profile progression/reset behavior remains unchanged.
-- Figma is used to settle visual proportions/tokens; runtime visuals are recreated with lightweight LÖVE drawing and existing sprite assets.
+- Figma settles visual proportions/tokens; runtime visuals are recreated with lightweight LÖVE drawing and existing sprite assets.
 - Final release version is `1.8.0`.
 
 ---
 
-### Task 1: Build and approve the Figma visual reference
+### Task 1: Build the Figma visual reference
 
 **Files:**
-- No runtime files modified.
-- Create/update project note after design: `docs/ui/2026-09-01-hybrid-ui-reference.md`
+- Create: `docs/ui/2026-09-01-hybrid-ui-reference.md`
 
 **Interfaces:**
-- Consumes: approved layout from the design spec.
-- Produces: one Figma Design file named `Deck Talents v1.8 — Hybrid Talent Universe` and a documented token/proportion reference for code.
+- Consumes: approved design spec.
+- Produces: Figma Design file `Deck Talents v1.8 — Hybrid Talent Universe` plus exact runtime geometry/tokens.
 
-- [ ] **Step 1: Load the required Figma skills before any Figma write**
+- [ ] **Step 1: Load required Figma skills before any write**
 
-Use `figma-use` and `figma-generate-design`; do not call Figma write tools before loading those skills.
+Use `figma-use` and `figma-generate-design` before Figma write calls.
 
 - [ ] **Step 2: Create one 1920×1080 primary frame**
 
-Frame name: `Talent Universe / Hybrid / 1920x1080`.
-
-Use these exact region proportions:
+Frame: `Talent Universe / Hybrid / 1920x1080`.
 
 ```text
 Outer margin: 24 px
@@ -55,21 +52,21 @@ Left rail: 270 px wide
 Right inspector: 430 px wide
 Bottom hint row: 34 px high
 Gap between side rails and constellation: 18 px
-Panel corner radius reference: 14 px
-Primary button corner radius reference: 10 px
+Panel corner radius: 14 px
+Primary button corner radius: 10 px
 ```
 
-- [ ] **Step 3: Build the visual hierarchy in Figma**
+- [ ] **Step 3: Build the reference screen**
 
-Include: Balatro-like chunky header/panels; subtle cosmic center background; one locked, one unlockable, one purchased, one selected, and one legendary node; bright purchased path vs dim reachable path; top profile/TP controls; left rail; detailed inspector; bottom hint row.
+Include the top header, left rail, center constellation, right inspector, bottom hint row, purchased/reachable route contrast, and one each of locked/unlockable/purchased/selected/legendary nodes.
 
-- [ ] **Step 4: Use only two deck accent examples**
+- [ ] **Step 4: Validate the same geometry with Red and Plasma accents**
 
-Use Red and Plasma to verify that the same geometry works for a warm and cool/purple accent. Do not build 15 separate screens.
+Do not create 15 deck-specific screens; use Red and Plasma as warm/cool stress tests.
 
-- [ ] **Step 5: Capture a screenshot and write the implementation reference note**
+- [ ] **Step 5: Capture a screenshot and write the code reference note**
 
-`docs/ui/2026-09-01-hybrid-ui-reference.md` records the exact geometry above plus these runtime rules:
+Record these runtime tokens exactly:
 
 ```text
 Panel background alpha: 0.88
@@ -77,12 +74,12 @@ Inner panel alpha: 0.78
 Locked node alpha: 0.28
 Unlockable node alpha: 0.72
 Purchased node alpha: 1.00
-Selected outline: white, 3 px at 1x reference scale
-Legendary outline/glow: gold, 4 px at 1x reference scale
-Background decoration: static/bounded only; no object creation per frame
+Selected outline: white, 3 px at 1x
+Legendary outline/glow: gold, 4 px at 1x
+Background decoration: static/bounded; no object creation per frame
 ```
 
-- [ ] **Step 6: Commit the reference note**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add docs/ui/2026-09-01-hybrid-ui-reference.md
@@ -98,48 +95,40 @@ git commit -m "docs: lock hybrid talent universe visual reference"
 - Create: `ui_inspector.lua`
 - Create: `tests/test_ui_theme.lua`
 - Create: `tests/test_ui_inspector.lua`
-- Modify: `talent_map.lua` loader section before the final direct HUD block
+- Modify: `talent_map.lua` loader area before the final direct-HUD override
 
 **Interfaces:**
-- Produces `DT.ui_theme` with:
-  - `layout(screen_w, screen_h) -> table`
-  - `mix(colour, strength, alpha) -> colour`
-  - `node_style(state, legendary, accent) -> table`
-- Produces `DT.ui_inspector` with:
-  - `format(args) -> model`
-- `format(args)` accepts exact keys: `title`, `kind`, `description`, `trigger`, `scaling`, `current`, `ante8`, `status`, `cost`, `requirements`, `accent`.
+- `DT.ui_theme.layout(screen_w, screen_h) -> geometry`
+- `DT.ui_theme.mix(colour, strength, alpha) -> colour`
+- `DT.ui_theme.node_style(state, legendary, accent) -> style`
+- `DT.ui_inspector.format(args) -> model`
+- Inspector args: `title`, `kind`, `description`, `trigger`, `scaling`, `current`, `ante8`, `status`, `cost`, `requirements`, `accent`.
 
 - [ ] **Step 1: Write failing geometry/state tests**
 
 ```lua
 local T = dofile('ui_theme.lua')
-local g = T.layout(1920, 1080)
-assert(g.header_h == 86)
-assert(g.left_w == 270)
-assert(g.right_w == 430)
-assert(g.bottom_h == 34)
-assert(g.center_w == 1920 - 48 - 270 - 430 - 36)
-
-local locked = T.node_style('locked', false, {1,0,0,1})
-local ready = T.node_style('unlockable', false, {1,0,0,1})
-local owned = T.node_style('purchased', false, {1,0,0,1})
-local legendary = T.node_style('purchased', true, {1,0,0,1})
-assert(locked.alpha == 0.28)
-assert(ready.alpha == 0.72)
-assert(owned.alpha == 1.00)
+local g = T.layout(1920,1080)
+assert(g.header_h == 86 and g.left_w == 270 and g.right_w == 430 and g.bottom_h == 34)
+assert(g.center_w == 1136)
+local locked = T.node_style('locked',false,{1,0,0,1})
+local ready = T.node_style('unlockable',false,{1,0,0,1})
+local owned = T.node_style('purchased',false,{1,0,0,1})
+local legendary = T.node_style('purchased',true,{1,0,0,1})
+assert(locked.alpha == 0.28 and ready.alpha == 0.72 and owned.alpha == 1.00)
 assert(legendary.outline_width == 4)
 print('ui theme OK')
 ```
 
-- [ ] **Step 2: Write failing inspector-formatting test**
+- [ ] **Step 2: Write failing inspector test**
 
 ```lua
 local I = dofile('ui_inspector.lua')
 local m = I.format({
-  title='Anger Management', kind='Strong', description='+2 Mult per Ante.',
-  trigger='After first discard this Blind', scaling='+2 Mult / Ante',
-  current='+10 Mult at Ante 5', ante8='+16 Mult', status='OWNED - ACTIVE',
-  cost='3 TP', requirements={'Emergency Discard'}, accent={1,0,0,1},
+  title='Anger Management',kind='Strong',description='+2 Mult per Ante.',
+  trigger='After first discard this Blind',scaling='+2 Mult / Ante',
+  current='+10 Mult at Ante 5',ante8='+16 Mult',status='OWNED - ACTIVE',
+  cost='3 TP',requirements={'Emergency Discard'},accent={1,0,0,1},
 })
 assert(m.sections[1].label == 'EFFECT')
 assert(m.sections[2].label == 'TRIGGER')
@@ -149,32 +138,31 @@ assert(m.sections[5].label == 'ANTE 8')
 print('ui inspector OK')
 ```
 
-- [ ] **Step 3: Run tests and confirm missing-module failures**
+- [ ] **Step 3: Run and confirm missing-module failures**
 
 ```bash
 texlua tests/test_ui_theme.lua
 texlua tests/test_ui_inspector.lua
 ```
 
-- [ ] **Step 4: Implement both pure modules**
+- [ ] **Step 4: Implement the modules**
 
-`layout()` must scale the reference geometry uniformly using `min(screen_w/1920, screen_h/1080)` and return pixel-space rectangles for header, left, center, right, and bottom. `node_style()` returns deterministic alpha/outline/glow values; it must not allocate or retain global state.
+`ui_theme.layout()` uses `s = min(screen_w/1920, screen_h/1080)` and returns scaled pixel rectangles for `header`, `left`, `center`, `right`, and `bottom`, plus the scalar and the exact reference widths/heights. `node_style()` maps only `locked`, `unlockable`, `purchased`, `selected`; `legendary` is a separate boolean that overrides outline/glow strength.
 
-`ui_inspector.format()` builds a plain-data model and omits only sections whose input is nil/empty; it never touches `G`, LÖVE, or Steamodded.
+`ui_inspector.format()` creates ordered sections in the order Effect, Trigger, Scaling, Current, Ante 8, Requirements. It omits only nil/empty optional sections and touches no Balatro/LÖVE globals.
 
-- [ ] **Step 5: Load modules once in `talent_map.lua`**
+- [ ] **Step 5: Load once in `talent_map.lua`**
 
 ```lua
 local ui_theme_chunk = SMODS.load_file('ui_theme.lua')
 if not ui_theme_chunk then error('Deck Talents could not load ui_theme.lua') end
 DT.ui_theme = ui_theme_chunk()
-
 local ui_inspector_chunk = SMODS.load_file('ui_inspector.lua')
 if not ui_inspector_chunk then error('Deck Talents could not load ui_inspector.lua') end
 DT.ui_inspector = ui_inspector_chunk()
 ```
 
-- [ ] **Step 6: Run tests/parser and commit**
+- [ ] **Step 6: Test, parse, commit**
 
 ```bash
 texlua tests/test_ui_theme.lua
@@ -191,14 +179,14 @@ git commit -m "test: add pure hybrid UI models"
 ### Task 3: Replace the direct HUD shell with the hybrid header/rails
 
 **Files:**
-- Modify: `talent_map.lua:5391-end` final v1.7.13 direct-HUD block
+- Modify: final direct-HUD block in `talent_map.lua` beginning at the v1.7.13 marker
 - Create: `tests/test_direct_hud_contract.py`
 
 **Interfaces:**
 - Consumes: `DT.ui_theme.layout()`.
-- Produces direct-drawn functions `draw_header180`, `draw_left180`, `draw_bottom_hints180`, and existing hitbox table behavior through `button1713` or its renamed v1.8 equivalent.
+- Produces: `draw_header180`, `draw_left180`, `draw_bottom_hints180` and bounded plain-table hitboxes.
 
-- [ ] **Step 1: Write a failing static contract test**
+- [ ] **Step 1: Write the failing contract test**
 
 ```python
 from pathlib import Path
@@ -208,13 +196,12 @@ assert marker in src
 final = src[src.index(marker):]
 assert 'draw_header180' in final
 assert 'draw_bottom_hints180' in final
-assert 'UIBox({' not in final
-assert 'UIBox{' not in final
+assert 'UIBox({' not in final and 'UIBox{' not in final
 assert 'G.UIT.' not in final
 print('direct HUD contract OK')
 ```
 
-- [ ] **Step 2: Run and confirm it fails on missing v1.8 draw functions**
+- [ ] **Step 2: Run and confirm missing-function failure**
 
 ```bash
 python tests/test_direct_hud_contract.py
@@ -222,25 +209,23 @@ python tests/test_direct_hud_contract.py
 
 - [ ] **Step 3: Implement the top header**
 
-Header content, left-to-right: active deck/global label + emblem text, Balatro Profile number, TP total, `HELP`, `SETTINGS`, `RESET`, `BACK`. `RESET` calls existing `G.FUNCS.dt_reset_profile_progression` and retains the two-tap/5-second confirmation behavior.
+Left-to-right: deck/global label, Balatro Profile number, TP total, `HELP`, `SETTINGS`, `RESET`, `BACK`. `RESET` calls existing `G.FUNCS.dt_reset_profile_progression`; do not duplicate reset logic.
 
 - [ ] **Step 4: Simplify the left rail**
 
-Keep: Universe/deck focus label, `CENTER GLOBAL`, Ante Scaling, zoom `- / % / +`, `OVERVIEW`, and a compact five-state legend. Move `LIVE POWER` and `LEGACY` into Help/Settings utility rows so the left rail is not a button stack.
+Keep `CENTER GLOBAL`, Ante Scaling, zoom `- / % / +`, `OVERVIEW`, and a five-state legend. Move `LIVE POWER` and `LEGACY` into Help/Settings mode.
 
-- [ ] **Step 5: Add the always-visible bottom hint row**
-
-Exact text at 1x reference:
+- [ ] **Step 5: Add the bottom hint row**
 
 ```text
 DRAG TO PAN    •    WHEEL / +/- TO ZOOM    •    TAP A STAR TO INSPECT
 ```
 
-- [ ] **Step 6: Keep hitbox allocation bounded**
+- [ ] **Step 6: Preserve bounded hitboxes**
 
-`reset_buttons1713()` may reset/reuse the array count each draw, but the code must not append unbounded history. After drawing, `H.button_count` must equal the number of visible controls for that frame.
+Reset/reuse `H.buttons` each draw. `H.button_count` equals visible controls for the current frame; no history list is retained.
 
-- [ ] **Step 7: Run the contract test/parser and commit**
+- [ ] **Step 7: Test, parse, commit**
 
 ```bash
 python tests/test_direct_hud_contract.py
@@ -251,26 +236,26 @@ git commit -m "feat: add hybrid direct HUD shell"
 
 ---
 
-### Task 4: Build the structured talent inspector and in-place Help/Settings modes
+### Task 4: Build structured Talent/Help/Settings inspector modes
 
 **Files:**
-- Modify: `talent_map.lua` functions replacing `inspector_model1713`, `draw_empty_inspector1713`, `draw_inspector1713`
-- Modify: `main.lua` only if a live-preview helper needs a stable trigger/scaling string accessor
+- Modify: final `inspector_model1713`, empty-inspector and inspector draw functions in `talent_map.lua`
+- Modify: `main.lua` only if a stable trigger/scaling accessor is required
 - Modify: `tests/test_ui_inspector.lua`
 
 **Interfaces:**
-- Consumes: final balance descriptions/live values and `DT.ui_inspector.format()`.
-- Produces: `H.mode` with exact values `talent`, `help`, `settings`; `H.mode='talent'` is default.
+- `H.mode` exact values: `talent`, `help`, `settings`; default `talent`.
+- Selecting a star always sets `H.mode='talent'`.
 
-- [ ] **Step 1: Extend the inspector test for optional sections**
+- [ ] **Step 1: Extend inspector tests**
 
-Verify a non-Ante talent omits `ANTE 8`, a cosmetic talent can omit `CURRENT`, and a locked talent still returns Cost/State and Requirements.
+Assert that a non-Ante talent omits `ANTE 8`, a cosmetic can omit `CURRENT`, and a locked talent still includes state/cost/requirements.
 
-- [ ] **Step 2: Refactor `inspector_model1713()` to cache structured fields**
+- [ ] **Step 2: Build a cache key from actual dependencies**
 
-Cache key must include selected scope/deck/id, profile key, current Ante, points, enabled state, and a compact relevant-state token. Do not invalidate merely because `love.draw` ran.
+Include selected scope/deck/id, profile key, current Ante, TP, owned/enabled state, `H.mode`, and compact run-state values used by the selected talent. Do not key on frame count/time.
 
-- [ ] **Step 3: Render the sections in this exact order**
+- [ ] **Step 3: Render Talent mode in this order**
 
 ```text
 Talent Name / Kind
@@ -284,15 +269,15 @@ REQUIRES
 Action button
 ```
 
-- [ ] **Step 4: Implement Help mode in the right panel**
+- [ ] **Step 4: Implement Help mode in-place**
 
-Help mode explains the five node states, pan/zoom/tap controls, `LIVE POWER`, `LEGACY`, and Ante Scaling. It is plain direct-drawn text/buttons; no overlay/UIBox is created.
+Explain node states, pan/zoom/tap, Ante Scaling, Live Power, and Legacy. Use direct text/buttons only.
 
-- [ ] **Step 5: Implement Settings mode in the right panel**
+- [ ] **Step 5: Implement Settings mode in-place**
 
-Settings mode shows active profile, Ante Scaling toggle, `LIVE POWER`, `LEGACY`, and `RESET CURRENT PROFILE`. Reset uses the existing double-tap callback; Settings itself does not mutate profile state directly.
+Show active profile, Ante Scaling toggle, `LIVE POWER`, `LEGACY`, and `RESET CURRENT PROFILE`. Reset retains the existing two-tap/5-second confirmation callback.
 
-- [ ] **Step 6: Test, parse, and commit**
+- [ ] **Step 6: Test, parse, commit**
 
 ```bash
 texlua tests/test_ui_inspector.lua
@@ -305,66 +290,79 @@ git commit -m "feat: add structured direct-draw inspector"
 
 ---
 
-### Task 5: Polish constellation nodes, routes, and center backdrop
+### Task 5: Polish node states, routes, and center atmosphere
 
 **Files:**
-- Modify: `talent_map.lua:136-175`, `talent_map.lua:2738-3140`, final `constellation_node` override around the v1.7.1+ section
+- Modify: node style helpers near `talent_map.lua:136-175`
+- Modify: constellation node/route code around `talent_map.lua:2738-3140` and the final constellation-node override
+- Modify: final `love.draw` wrapper in the direct-HUD block
 - Modify: `tests/test_ui_theme.lua`
+- Modify: `tests/test_direct_hud_contract.py`
 
 **Interfaces:**
-- Consumes: `DT.ui_theme.node_style()` and existing deck accent colors.
-- Produces: five visually distinct node states without changing positions or prerequisite graph.
+- Consumes: `DT.ui_theme.node_style()`.
+- Produces: five readable visual states without route-coordinate changes.
 
-- [ ] **Step 1: Add node-state assertions**
+- [ ] **Step 1: Extend node-state tests**
 
-Test exact state names: `locked`, `unlockable`, `purchased`, `selected`, `legendary`. Legendary selected remains gold-dominant with white selection outline; purchased non-legendary uses deck accent.
+Test `locked`, `unlockable`, `purchased`, `selected` plus `legendary=true`. Selected uses white outline; legendary uses gold glow and a 4px reference outline.
 
-- [ ] **Step 2: Route the final constellation node renderer through theme state**
-
-State mapping:
+- [ ] **Step 2: Route final node rendering through theme state**
 
 ```lua
-if selected then state = 'selected'
-elseif owned then state = 'purchased'
-elseif ready then state = 'unlockable'
-else state = 'locked' end
+local state = selected and 'selected' or (owned and 'purchased' or (ready and 'unlockable' or 'locked'))
+local style = DT.ui_theme.node_style(state, talent.kind == 'Legendary', accent)
 ```
 
-Legendary is a separate boolean, not a sixth ownership state.
+Do not change talent coordinates, prerequisite edges, or sparse-map layout.
 
-- [ ] **Step 3: Improve route contrast without rebuilding routes on selection**
+- [ ] **Step 3: Improve route contrast**
 
-Purchased route: strongest deck/global accent. Reachable route: 55% accent. Locked/future route: existing hidden/dim behavior. Selected path can brighten using already-computed selected route state; do not alter graph coordinates.
+Purchased route = full accent; reachable route = 55% accent; locked/future route retains hidden/dim behavior. Selection may brighten already-computed selected-route segments only.
 
-- [ ] **Step 4: Add a static center backdrop drawn by the direct layer**
+- [ ] **Step 4: Add bounded center atmosphere in the correct draw order**
 
-Draw only a vignette/very sparse deterministic stars using a fixed precomputed table created once when the module loads. No `math.random()` or table growth inside `love.draw`.
+Create a fixed star/vignette table once at module initialization. Add `draw_backdrop180()` and call it **before** the wrapped Balatro draw, then call the HUD after Balatro draw:
 
-- [ ] **Step 5: Run tests/parser and commit**
+```lua
+love.draw = function(...)
+  draw_backdrop180()
+  old_draw_v1713(...)
+  draw_direct_hud180()
+end
+```
+
+`draw_backdrop180()` may draw only static gradient/vignette/sparse-star primitives and may not mutate/grow tables. The post-draw HUD may add a very light center vignette overlay only if it does not obscure nodes.
+
+- [ ] **Step 5: Extend the contract test for wrapper order**
+
+The Python test must assert the final wrapper contains `draw_backdrop180()` before `old_draw_v1713(...)`, and the HUD call after it.
+
+- [ ] **Step 6: Test, parse, commit**
 
 ```bash
 texlua tests/test_ui_theme.lua
 python tests/test_direct_hud_contract.py
 texluac -p talent_map.lua
-git add talent_map.lua tests/test_ui_theme.lua
+git add talent_map.lua tests/test_ui_theme.lua tests/test_direct_hud_contract.py
 git commit -m "feat: polish constellation state hierarchy"
 ```
 
 ---
 
-### Task 6: Add explicit cache/performance regression instrumentation
+### Task 6: Add explicit cache/performance regression guards
 
 **Files:**
-- Modify: `talent_map.lua` direct HUD state table only
+- Modify: direct HUD state table/functions in `talent_map.lua`
 - Create: `tests/test_ui_performance_contract.py`
 - Modify: `TESTING_CHECKLIST.md`
 
 **Interfaces:**
-- Produces debug counters in `H.debug` only: `draws`, `inspector_builds`, `button_peak`. Counters are numbers and do not retain object references.
+- Produces numeric-only `H.debug={draws,inspector_builds,button_peak}`.
 
-- [ ] **Step 1: Write a failing source contract**
+- [ ] **Step 1: Write the failing source contract**
 
-The Python test asserts that the direct HUD has no `UIBox` creation, no `G.UIT` construction, no `table.insert(H.buttons` history, and that `inspector_builds` increments only inside the inspector model rebuild path.
+Assert: no UIBox/G.UIT creation in the final direct-HUD block; no retained `table.insert(H.buttons,...)` history; `inspector_builds` increments only in the cache-rebuild path.
 
 - [ ] **Step 2: Add bounded counters**
 
@@ -372,23 +370,21 @@ The Python test asserts that the direct HUD has no `UIBox` creation, no `G.UIT` 
 H.debug = H.debug or {draws=0, inspector_builds=0, button_peak=0}
 ```
 
-Increment `draws` once per direct HUD draw; increment `inspector_builds` only when a dirty/key-mismatch model is rebuilt; update `button_peak = math.max(button_peak, H.button_count or 0)`.
+Increment `draws` once per HUD frame; `inspector_builds` only when rebuilding a dirty/key-mismatched model; `button_peak=math.max(button_peak,H.button_count or 0)`.
 
-- [ ] **Step 3: Add the Android regression loop to `TESTING_CHECKLIST.md`**
-
-Exact manual sequence:
+- [ ] **Step 3: Add the exact Android stress sequence**
 
 ```text
 1. Open Talent Universe.
-2. Tap between 10 different stars 20 times each (200 selections total).
+2. Tap 10 different stars 20 times each (200 selections).
 3. Perform 25 zoom-in + zoom-out cycles (50 camera changes).
-4. Pan across all four quadrants for 60 seconds.
-5. Toggle Help/Settings/Talent inspector 30 times.
+4. Pan across all quadrants for 60 seconds.
+5. Toggle Help/Settings/Talent mode 30 times.
 6. Close/reopen Talent Universe 5 times.
-7. PASS only if interaction latency does not progressively increase and no side panel disappears.
+7. PASS only if latency does not progressively increase and no side panel disappears.
 ```
 
-- [ ] **Step 4: Run static checks and commit**
+- [ ] **Step 4: Test, parse, commit**
 
 ```bash
 python tests/test_direct_hud_contract.py
@@ -400,28 +396,28 @@ git commit -m "test: guard direct HUD performance architecture"
 
 ---
 
-### Task 7: Full static QA and documentation sync
+### Task 7: Full static QA and v1.8.0 metadata
 
 **Files:**
-- Modify: `README.md`
-- Modify: `CHANGELOG.md`
-- Modify: `DeckTalents.json`
-- Modify: `main.lua` debug metadata/version note
+- Modify: `README.md`, `CHANGELOG.md`, `DeckTalents.json`, `main.lua`
 - Create: `docs/validation/2026-09-01-ui-release.md`
 
 **Interfaces:**
-- Consumes: completed balance + UI changes.
-- Produces: v1.8.0 release candidate metadata and validation record.
+- Produces v1.8.0 release-candidate metadata and validation record.
 
-- [ ] **Step 1: Bump release metadata to `1.8.0`**
+- [ ] **Step 1: Set version metadata**
 
-`DeckTalents.json` version and `MOD.debug_info.version` must both be `1.8.0`. Changelog heading: `Deck Talents 1.8.0 — HYBRID TALENT UNIVERSE / FULL DECK BALANCE PASS`.
+`DeckTalents.json` version and `MOD.debug_info.version` become `1.8.0`. Changelog heading is exactly:
+
+```text
+Deck Talents 1.8.0 — HYBRID TALENT UNIVERSE / FULL DECK BALANCE PASS
+```
 
 - [ ] **Step 2: Update README**
 
-Describe the hybrid direct-draw UI, per-profile progression, Red benchmark, and that all remaining vanilla deck trees received the strong-but-fair pass.
+Describe the hybrid direct-draw UI, per-profile progression, Red benchmark, and full non-Red strong-but-fair balance pass.
 
-- [ ] **Step 3: Run all tests from both plans**
+- [ ] **Step 3: Run every test from both plans**
 
 ```bash
 find . -maxdepth 1 -name '*.lua' -print0 | xargs -0 -n1 texluac -p
@@ -431,18 +427,11 @@ python -m json.tool DeckTalents.json >/dev/null
 luacheck *.lua tests/*.lua
 ```
 
-- [ ] **Step 4: Confirm no forbidden direct-HUD construction**
+- [ ] **Step 4: Record exact results**
 
-```bash
-python tests/test_direct_hud_contract.py
-python tests/test_ui_performance_contract.py
-```
+The validation note records command, exit code, Luacheck warnings retained, and that Android cumulative-lag validation is a device test of the release ZIP.
 
-- [ ] **Step 5: Record exact command outputs in the release validation note**
-
-Include parser/test/Luacheck/JSON results and note that Android cumulative-lag testing remains a device-level validation item until run in Balatro.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add README.md CHANGELOG.md DeckTalents.json main.lua docs/validation/2026-09-01-ui-release.md
@@ -451,16 +440,15 @@ git commit -m "release: prepare Deck Talents 1.8.0"
 
 ---
 
-### Task 8: Package v1.8.0 and verify the archive
+### Task 8: Package and verify v1.8.0
 
 **Files:**
-- Generated artifact: `DeckTalents_v1.8.0.zip`
+- Generate: `/mnt/data/DeckTalents_v1.8.0.zip`
 
 **Interfaces:**
-- Consumes: clean v1.8.0 worktree.
-- Produces: installable Deck Talents mod ZIP with a single top-level `DeckTalents/` directory.
+- Produces one installable ZIP with top-level `DeckTalents/`.
 
-- [ ] **Step 1: Create a clean staging folder**
+- [ ] **Step 1: Stage release contents**
 
 ```bash
 rm -rf /tmp/DeckTalents-release
@@ -468,23 +456,23 @@ mkdir -p /tmp/DeckTalents-release/DeckTalents
 rsync -a --exclude '.git/' --exclude 'tests/' --exclude 'docs/superpowers/' --exclude 'docs/validation/' ./ /tmp/DeckTalents-release/DeckTalents/
 ```
 
-- [ ] **Step 2: Build the ZIP**
+- [ ] **Step 2: Build ZIP**
 
 ```bash
 cd /tmp/DeckTalents-release
 zip -qr /mnt/data/DeckTalents_v1.8.0.zip DeckTalents
 ```
 
-- [ ] **Step 3: Verify archive integrity and structure**
+- [ ] **Step 3: Verify integrity/structure**
 
 ```bash
 unzip -t /mnt/data/DeckTalents_v1.8.0.zip
 unzip -l /mnt/data/DeckTalents_v1.8.0.zip | head -80
 ```
 
-Expected: no archive errors; `DeckTalents/main.lua`, `DeckTalents/talents.lua`, `DeckTalents/deck_expansion.lua`, `DeckTalents/talent_map.lua`, `DeckTalents/balance_runtime.lua`, `DeckTalents/ui_theme.lua`, `DeckTalents/ui_inspector.lua`, and both asset-resolution directories are present.
+Must include `main.lua`, `talents.lua`, `deck_expansion.lua`, `talent_map.lua`, `balance_runtime.lua`, `ui_theme.lua`, `ui_inspector.lua`, and `assets/1x`, `assets/2x`.
 
-- [ ] **Step 4: Parse the packaged Lua files, not only the worktree copies**
+- [ ] **Step 4: Parse the packaged Lua copies**
 
 ```bash
 rm -rf /tmp/decktalents-package-check
@@ -493,6 +481,6 @@ unzip -q /mnt/data/DeckTalents_v1.8.0.zip -d /tmp/decktalents-package-check
 find /tmp/decktalents-package-check/DeckTalents -maxdepth 1 -name '*.lua' -print0 | xargs -0 -n1 texluac -p
 ```
 
-- [ ] **Step 5: Commit any final validation-note update, but never modify code after the package check without rebuilding/rechecking the ZIP**
+- [ ] **Step 5: Freeze the artifact after validation**
 
-The generated ZIP is the user-facing deliverable. The next action after this task is device playtesting of the exact ZIP, not another silent code edit.
+Any code change after this step requires rebuilding and rerunning Steps 2-4. The exact ZIP produced here is the device-playtest candidate.
